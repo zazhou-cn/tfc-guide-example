@@ -1,24 +1,74 @@
-provider "aws" {
-  version = "2.33.0"
-
-  region = var.aws_region
+resource "tls_private_key" "fullnode" {
+  algorithm = "RSA"
 }
 
-provider "random" {
-  version = "2.2"
+resource "alicloud_key_pair" "fullnode" {
+  key_name   = "${var.ssh_key_name}-${local.resource_name}"
+  public_key = tls_private_key.fullnode.public_key_openssh
 }
 
-resource "random_pet" "table_name" {}
+# Store the private key into a file
+resource "local_file" "private_key_pem" {
+  filename = "${var.ssh_key_name}.pem"
+  content  = tls_private_key.fullnode.private_key_pem
+  file_permission = 400
+}
 
-resource "aws_dynamodb_table" "tfc_example_table" {
-  name = "${var.db_table_name}-${random_pet.table_name.id}"
+resource "alicloud_instance" "fullnode" {
+  
+  availability_zone = data.alicloud_zones.my_zones.zones.0.id
+  security_groups = alicloud_security_group.default.*.id
+  instance_type        = data.alicloud_instance_types.default.instance_types.0.id
+  system_disk_category = var.system_disk_category
+  image_id             = var.os_image_id
+  instance_name        = var.instance_name
+  vswitch_id = alicloud_vswitch.vsw.id
+  internet_max_bandwidth_out = var.bandwidth
+  key_name = alicloud_key_pair.fullnode.key_name
+  #password = "Tunwu2020$"
 
-  read_capacity  = var.db_read_capacity
-  write_capacity = var.db_write_capacity
-  hash_key       = "UUID"
-
-  attribute {
-    name = "UUID"
-    type = "S"
+  connection {
+    host = self.public_ip
+    type = "ssh"
+    user = "root"
+    #password = "Tunwu2020$"
+    private_key = tls_private_key.fullnode.private_key_pem
   }
+
+  provisioner "file" {
+    source = "jdk-8u271-linux-x64.tar.gz"
+    destination = "/tmp/jdk"
+  }
+
+  provisioner "file" {
+    source = "FullNode.jar"
+    destination = "/tmp/FullNode.jar"
+  }
+
+  provisioner "file" {
+    source = "config.conf"
+    destination = "/tmp/config.conf"
+  }
+
+  provisioner "file" {
+    source = "set_java_var.sh"
+    destination = "/tmp/set_java_var.sh"
+  }
+
+  provisioner "remote-exec" {
+
+  inline = [
+   "set -e",
+   "mkdir -p /usr/lib/jvm",
+   "mkdir -p /project/tron",
+   "cp /tmp/jdk /usr/lib/jvm",
+   "chmod +x /tmp/set_java_var.sh",
+   "cp /tmp/set_java_var.sh /usr/lib/jvm",
+   "cp /tmp/FullNode.jar /project/tron",
+   "cp /tmp/config.conf /project/tron",
+   "cd /usr/lib/jvm",
+   "tar xvzf jdk",
+   "./set_java_var.sh",
+  ]
+ }
 }
