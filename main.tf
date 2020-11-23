@@ -35,30 +35,14 @@ resource "alicloud_instance" "fullnode" {
     private_key = tls_private_key.fullnode.private_key_pem
   }
 
-  provisioner "file" {
-    source = "jdk-8u271-linux-x64.tar.gz"
-    destination = "/tmp/jdk"
-  }
-
-  provisioner "file" {
-    source = "FullNode.jar"
-    destination = "/tmp/FullNode.jar"
-  }
-
-  provisioner "file" {
-    source = "config.conf"
-    destination = "/tmp/config.conf"
-  }
-
-  provisioner "file" {
-    source = "set_java_var.sh"
-    destination = "/tmp/set_java_var.sh"
-  }
-
   provisioner "remote-exec" {
 
   inline = [
    "set -e",
+   "wget https://tron-noops-resources.oss-cn-shanghai.aliyuncs.com/tron/jdk-8u271-linux-x64.tar.gz -O /tmp/jdk-8u271-linux-x64.tar.gz",
+   "wget https://tron-noops-resources.oss-cn-shanghai.aliyuncs.com/tron/FullNode.jar -O /tmp/FullNode.jar",
+   "wget https://tron-noops-resources.oss-cn-shanghai.aliyuncs.com/tron/config.conf -O /tmp/config.conf",
+   "wget https://tron-noops-resources.oss-cn-shanghai.aliyuncs.com/tron/set_java_var.sh -O /tmp/set_java_var.sh",
    "mkdir -p /usr/lib/jvm",
    "mkdir -p /project/tron",
    "cp /tmp/jdk /usr/lib/jvm",
